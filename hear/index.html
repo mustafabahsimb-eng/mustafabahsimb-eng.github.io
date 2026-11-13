@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <style>
+  [hidden]{display:none!important}
   :root{--bg:#F4EEE3;--fg:#2B2A28;--muted:#7a746b;--card:#fff;--line:#e3dccf;--accent:#2B2A28}
   *{box-sizing:border-box}
   body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--fg)}
@@ -111,8 +112,7 @@ const SIZES = {
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-
-if (params.get('a')) startPlayer(params.get('a')); else startMaker();
+let theme = 'cream', peaks = null, link = null, nameTxt = '', line2Txt = '';
 
 function audioCtx(){ return new (window.AudioContext || window.webkitAudioContext)(); }
 function decode(buf){
@@ -131,8 +131,6 @@ function peaksOf(audio, n){
 }
 function mp3Url(id){ return 'https://res.cloudinary.com/' + CLOUD + '/video/upload/' + id + '.mp3'; }
 function fmt(s){ s = Math.floor(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-
-let theme = 'cream', peaks = null, link = null, nameTxt = '', line2Txt = '';
 
 function startMaker(){
   $('maker').hidden = false;
@@ -297,6 +295,8 @@ function startPlayer(id){
   audio.onloadedmetadata = () => $('ptime').textContent = '0:00 / ' + fmt(audio.duration);
   window.addEventListener('resize', draw);
 }
+
+if (params.get('a')) startPlayer(params.get('a')); else startMaker();
 </script>
 </body>
 </html>
