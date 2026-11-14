@@ -34,6 +34,9 @@
   .dl{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .dl button{padding:13px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
   .dl button.all{grid-column:1/-1;background:var(--accent);color:#fff}
+  .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;background:#F4EEE3;border:1px dashed #b9ad98;border-radius:10px;padding:14px;text-align:center;word-break:break-all;margin:8px 0 12px}
+  #locked .card{text-align:center}
+  #locked a{color:var(--accent);font-weight:600}
   #player{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#15171C;color:#E9DCC0}
   #player .box{width:100%;max-width:520px;padding:30px 22px;text-align:center}
   #player h1{color:#E9DCC0;font-size:40px}
@@ -45,16 +48,28 @@
 </head>
 <body>
 
+<div id="locked" hidden>
+  <div class="wrap">
+    <h1>Hear Them Again</h1>
+    <p class="sub">Turn a voice into a sound wave print with a QR code that plays it.</p>
+    <div class="card">
+      <p style="margin:0 0 12px">This page is for Hear Them Again customers. Please open it with the link in your <strong>Start Here</strong> guide.</p>
+      <p style="margin:0"><a href="https://bahsistore.etsy.com" target="_blank" rel="noopener">Get yours on Etsy &rarr;</a></p>
+    </div>
+  </div>
+</div>
+
 <div id="maker" hidden>
   <div class="wrap">
     <h1>Hear Them Again</h1>
-    <p class="sub">Upload a recording and your print is ready in seconds.</p>
+    <p class="sub" id="subline">Upload a recording and your print is ready in seconds.</p>
 
     <div class="card">
       <label for="file">1. Your recording</label>
       <input type="file" id="file" accept="audio/*,video/*,.m4a,.opus,.ogg,.mp3,.wav,.aac">
       <p class="hint">Voice memo, WhatsApp voice note, MP3, M4A, WAV. Up to 10 minutes.</p>
 
+      <div id="designFields">
       <label for="name">2. Name or title</label>
       <input type="text" id="name" maxlength="40" placeholder="e.g. Mom">
 
@@ -63,10 +78,18 @@
 
       <label>3. Colour style</label>
       <div class="themes" id="themes"></div>
+      </div>
     </div>
 
     <button class="main" id="go">Create my print</button>
     <div id="status"></div>
+
+    <div class="card" id="orderResult" hidden>
+      <label>Your recording code</label>
+      <div class="code" id="codeBox"></div>
+      <button class="main" id="copyCode">Copy code</button>
+      <p class="hint" style="margin:14px 0 0">Paste this code into the <strong>personalization box</strong> on Etsy, together with the name you want printed. We send you a proof before printing.</p>
+    </div>
 
     <div class="card" id="result">
       <img id="preview" alt="Your print preview">
@@ -95,8 +118,9 @@
 <script>
 const CLOUD = 'biqw7hzi';
 const PRESET = 'hear_them_again';
-const BASE = location.origin + location.pathname;
+const BASE = location.origin + location.pathname.replace(/order\/?$/, '');
 const MAX_SEC = 600, MAX_MB = 100, BARS = 180;
+const KEY_HASHES = ['4f7252d699008980f2e74309912499fdf6376434662e4a513906b8788559d6fe'];
 
 const THEMES = {
   cream:    {label:'Cream',         bg:'#F4EEE3', fg:'#2B2A28', wave:'#2B2A28', tile:'#FFFFFF'},
@@ -112,7 +136,8 @@ const SIZES = {
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
-let theme = 'cream', peaks = null, link = null, nameTxt = '', line2Txt = '';
+const ORDER = params.get('mode') === 'order' || /\/order\/?$/.test(location.pathname);
+let theme = 'cream', peaks = null, link = null, nameTxt = '', line2Txt = '', publicId = '';
 
 function audioCtx(){ return new (window.AudioContext || window.webkitAudioContext)(); }
 function decode(buf){
@@ -132,8 +157,24 @@ function peaksOf(audio, n){
 function mp3Url(id){ return 'https://res.cloudinary.com/' + CLOUD + '/video/upload/' + id + '.mp3'; }
 function fmt(s){ s = Math.floor(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
+async function sha256(t){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function hasAccess(){
+  let k = params.get('k');
+  try { if (k) localStorage.setItem('hta_k', k); else k = localStorage.getItem('hta_k'); } catch(e) {}
+  if (!k) return false;
+  return KEY_HASHES.includes(await sha256(k.trim().toUpperCase()));
+}
+
 function startMaker(){
   $('maker').hidden = false;
+  if (ORDER){
+    $('designFields').hidden = true;
+    $('subline').textContent = 'Upload your recording to get your code for your Etsy order.';
+    $('go').textContent = 'Upload and get my code';
+  }
   const box = $('themes');
   Object.entries(THEMES).forEach(([k, t]) => {
     const d = document.createElement('div');
@@ -148,6 +189,10 @@ function startMaker(){
     box.appendChild(d);
   });
   $('go').onclick = create;
+  $('copyCode').onclick = async () => {
+    try { await navigator.clipboard.writeText(publicId); $('copyCode').textContent = 'Copied!'; }
+    catch(e) { const r = document.createRange(); r.selectNodeContents($('codeBox')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  };
   document.querySelectorAll('.dl button[data-size]').forEach(b => b.onclick = () => download(b.dataset.size));
   $('all').onclick = async () => { for (const s of Object.keys(SIZES)){ await download(s); await new Promise(r => setTimeout(r, 700)); } };
 }
@@ -171,10 +216,20 @@ async function create(){
     const fd = new FormData();
     fd.append('file', f);
     fd.append('upload_preset', PRESET);
+    if (ORDER) fd.append('tags', 'etsy_order');
     const r = await fetch('https://api.cloudinary.com/v1_1/' + CLOUD + '/auto/upload', {method:'POST', body:fd});
     const j = await r.json();
     if (!r.ok || !j.public_id) throw new Error((j.error && j.error.message) || 'Upload failed. Please try again.');
+    publicId = j.public_id;
     link = BASE + '?a=' + encodeURIComponent(j.public_id);
+
+    if (ORDER){
+      $('codeBox').textContent = publicId;
+      $('orderResult').hidden = false;
+      status('Done! Copy your code below.');
+      $('orderResult').scrollIntoView({behavior:'smooth'});
+      return;
+    }
 
     if (!audio){
       status('Preparing your sound wave…');
@@ -296,7 +351,11 @@ function startPlayer(id){
   window.addEventListener('resize', draw);
 }
 
-if (params.get('a')) startPlayer(params.get('a')); else startMaker();
+(async () => {
+  if (params.get('a')) return startPlayer(params.get('a'));
+  if (ORDER || await hasAccess()) return startMaker();
+  $('locked').hidden = false;
+})();
 </script>
 </body>
 </html>
