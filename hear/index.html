@@ -154,7 +154,7 @@ function peaksOf(audio, n){
   const max = Math.max(...out) || 1;
   return out.map(v => Math.max(0.04, Math.sqrt(v / max)));
 }
-function mp3Url(id){ return 'https://res.cloudinary.com/' + CLOUD + '/video/upload/' + id + '.mp3'; }
+function mp3Url(id){ return 'https://res.cloudinary.com/' + CLOUD + '/video/upload/ac_mp3/' + id + '.mp3'; }
 function fmt(s){ s = Math.floor(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
 async function sha256(t){
